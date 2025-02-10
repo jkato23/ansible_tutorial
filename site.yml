@@ -4,12 +4,22 @@
   become: true
   pre_tasks:
 
-  - name: install updates (Ubuntu)
+  - name: update repo cache (Ubuntu)
     tags: always
     apt:
-      upgrade: dist
       update_cache: yes
+    changed_when: false
     when: ansible_distribution == "Ubuntu"
+
+- hosts: all
+  become: true
+  tasks:
+
+  - name: add ssh key for simone
+    tags: always
+    authorized_key:
+      user: simone
+      key: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIG2n9pyL7sqohMbEVlBVODXHOdsNC9wTMSLfbFDm4/5v ansible"
 
 - hosts: workstations
   become: true
@@ -28,6 +38,22 @@
         owner: root
         group: root
 
+    - name: change e-mail address for admin
+      tags: apache,apache2,ubuntu
+      lineinfile:
+        path: ./ansible_tutorial/adminEmail
+        regexp: '^ServerAdmin'
+        line: ServerAdmin somebody@somewhere.net
+      when: ansible_distribution == "Ubuntu"
+      register: apache2
+
+    - name: restart apache2 (Ubuntu)
+      tags: apache,apache2,ubuntu
+      service:
+        name: apache2
+        state: restarted
+      when: apache2.changed
+
 - hosts: web_servers
   become: true
   tasks:
@@ -39,6 +65,14 @@
         - apache2
         - libapache2-mod-php
       state: latest
+    when: ansible_distribution == "Ubuntu"
+
+  - name: start apache2 (Ubuntu)
+    tags: apache,apache2,ubuntu
+    service:
+      name: apache2
+      state: started
+      enabled: yes
     when: ansible_distribution == "Ubuntu"
 
   - name: copy default html file for site
@@ -60,3 +94,20 @@
       name: mariadb-server
       state: latest
     when: ansible_distribution == "Ubuntu"
+
+  - name: change name for admin
+    tags: db,mariadb,ubuntu
+    lineinfile:
+      path: ./Documents/adminName
+      regexp: '^AdminName'
+      line: AdminName Justin
+    when: ansible_distribution == "Ubuntu"
+    register: mariadb
+
+  - name: restart mariadb (Ubuntu)
+    tags: db,mariadb,ubuntu
+    service:
+      name: mariadb
+      state: restarted
+    when: mariadb.changed
+      
